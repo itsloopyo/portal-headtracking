@@ -1,0 +1,93 @@
+[workspace]
+name = "portal-head-tracking"
+version = "0.0.0"
+description = "Head tracking mod for Portal (Source Engine) using the CameraUnlock shared library"
+license = "MIT"
+license-file = "LICENSE"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[tasks]
+# Pull cameraunlock-core to the tip of its tracked branch. Manual: the new
+# pointer is a deliberate commit, no build task depends on this.
+sync = { cmd = "git submodule update --remote cameraunlock-core" }
+
+# Portal is 32-bit Source Engine (hl2.exe is PE machine 0x14c) - build x86.
+# No -G: let CMake auto-detect the installed Visual Studio generator. Pinning
+# "Visual Studio 17 2022" broke on CI once the windows runner image moved to
+# VS 2026 (VS 17 absent); auto-detect picks whatever VS the machine has.
+# Gated on the cache file rather than on build/ existing: CMake creates the
+# directory before it can fail, and a directory-only guard then skips configure
+# for good, so every later build fails on a tree that was never generated.
+setup = { cmd = """
+    powershell -NoProfile -Command "if (-not (Test-Path 'build/CMakeCache.txt')) { cmake -B build -A Win32 } else { Write-Host 'Build directory already configured, skipping setup' -ForegroundColor Yellow }"
+""" }
+
+build = { cmd = "cmake --build build --config Debug", depends-on = ["setup"] }
+build-release = { cmd = "cmake --build build --config Release", depends-on = ["setup"] }
+
+clean = { cmd = """
+    powershell -NoProfile -Command "if (Test-Path 'build') { Remove-Item 'build' -Recurse -Force }; Write-Host 'Build artifacts cleaned' -ForegroundColor Green"
+""" }
+
+# clean plus the packaged ZIPs. Chained rather than repeating clean's removal,
+# so the two tasks cannot drift apart over what "build output" means.
+clean-all = { cmd = """
+    powershell -NoProfile -Command "if (Test-Path 'release') { Remove-Item 'release' -Recurse -Force }; Write-Host 'Release artifacts cleaned' -ForegroundColor Green"
+""", depends-on = ["clean"] }
+
+# Everything that can silently ship a wrong artifact: ModVersion.psm1, which
+# every version read and write in this repo goes through, strip-loader-payload.ps1,
+# which rewrites the binary we redistribute, and the licence text the release
+# ZIPs are obliged to carry. No Pester: matches cameraunlock-core/powershell/tests.
+test = { depends-on = ["test-version", "test-strip-loader", "validate-notices"] }
+test-version = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/ModVersion.Tests.ps1" }
+test-strip-loader = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/StripLoaderPayload.Tests.ps1" }
+
+# Gates from cameraunlock-core, run against this repo.
+# validate-notices checks that THIRD-PARTY-NOTICES.md reproduces the licence
+# text of everything the release ZIPs ship, including the components compiled
+# into the vendored loader binary. It needs node, which this workspace does not
+# declare - it comes from the machine, like the C++ toolchain and CMake do. A
+# machine without it fails the task loudly rather than skipping the gate.
+# validate-manifest validates a BUILT installer ZIP under release/, so it fails
+# until `pixi run package` can produce one. It is here because the fleet's
+# tooling and error messages name it; the launcher-manifest check is
+# conformance's, not this one's.
+# conformance is the whole-repo shape check. validate-manifest is the only one
+# of the three that cannot pass yet.
+validate-notices = "node cameraunlock-core/scripts/validate-notices.mjs"
+validate-manifest = "node cameraunlock-core/scripts/validate-manifest.mjs"
+conformance = "powershell -NoProfile -ExecutionPolicy Bypass -File cameraunlock-core/scripts/conformance.ps1 -Repo ."
+
+# Print the installed client.dll's PE fingerprint as a build-profile stub. The
+# first thing to run when a user reports the dormant "no build profile matches"
+# line, and the first step of a rederive after a game patch.
+check-fingerprint = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-fingerprint.ps1" }
+
+# Bump the vendored Ultimate ASI Loader under vendor/. Manual: the vendored
+# copy is the install-time source of truth, so the dev runs this, reviews the
+# diff and commits it. No build task depends on it and CI never runs it.
+update-deps = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-deps.ps1" }
+
+# Strip the third-party DLLs the upstream x86 loader embeds as resources
+# (binkw32.dll, wndmode.dll, vorbisfile.dll). update-deps runs this already;
+# the task exists for a loader copied in by hand. package re-runs it in
+# -VerifyOnly mode.
+strip-loader = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/strip-loader-payload.ps1 -Path vendor/ultimate-asi-loader/dinput8.dll" }
+
+# Package release ZIPs (installer + nexus variants).
+package = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release"] }
+
+# Cut a release: pixi run release <major|minor|patch|X.Y.Z>
+release = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1"
+
+# The nightly channel. `pixi run release nightly` reaches the same script; the
+# task exists because the fleet's tooling and error messages name it directly.
+release-nightly = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-nightly.ps1"
+
+# Build + dev-deploy the debug .asi straight into <game>\bin. install.cmd is
+# the release-ZIP installer (deploys from a staged plugins\ folder) and is not
+# the dev path - it ships in the packaged release for the launcher / Nexus.
+install = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy.ps1 Debug", depends-on = ["build"] }
+uninstall = "scripts\\uninstall.cmd"

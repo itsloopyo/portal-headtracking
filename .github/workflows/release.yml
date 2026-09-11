@@ -1,0 +1,40 @@
+name: Release
+run-name: "Release ${{ github.ref_name }}"
+
+# Everything this release does lives in cameraunlock-core's release-mod.yml.
+# Only the values below are this mod's. Pinned to a commit SHA, never a branch:
+# that workflow runs with contents:write, the Discord webhook and the Lopari PAT.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Two tags pushed close together - a botched release and the fix right behind it
+# - otherwise run in parallel, and both dispatch a Lopari catalog re-pin. The
+# catalog then settles on whichever pin job finished last, and the earlier
+# release can sit out its full ten-minute poll waiting for a version it will
+# never see. Serialised, never cancelled: a release job that is killed part way
+# has already created a GitHub release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: itsloopyo/cameraunlock-core/.github/workflows/release-mod.yml@435915a8a3d8e1b799cc169b74f1fcf72b9534e7
+    with:
+      project-name: 'Portal Head Tracking'
+      version-source: regex
+      version-path: 'src/version.h'
+      version-pattern: '(?m)^#define\s+HEADTRACKING_VERSION_STRING\s+"([^"]+)"'
+      artifact-paths: 'src/ cameraunlock-core/ vendor/ scripts/install.cmd scripts/uninstall.cmd'
+      setup-msbuild: true
+    permissions:
+      contents: write
+    # `inherit`, not a named list. The callee reads DISCORD_RELEASE_WEBHOOK and
+    # LOPARI_APP_ACTIONS_TOKEN but declares no `on.workflow_call.secrets`, and
+    # passing a secret a called workflow has not declared is a validation error,
+    # so a named block fails the run before any job starts. Narrowing this means
+    # declaring both in release-mod.yml first.
+    secrets: inherit

@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+# Windows batch/cmd scripts MUST be CRLF or they silently fail on Windows.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# The vendored loader is a redistributed binary. `* text=auto` above leaves it
+# to git's content heuristic, which happens to get it right today because
+# dinput8.dll has a NUL at byte 3. Stated outright instead: a normalised DLL is
+# one whose 0x0a bytes were rewritten, and the arch and payload checks that
+# would notice only run after it is already committed.
+*.dll binary

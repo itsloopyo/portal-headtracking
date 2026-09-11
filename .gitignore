@@ -1,0 +1,56 @@
+# Build output. Anchored to the repo root: unanchored, `build*/` matches at
+# any depth and silently swallowed src/builds/, the per-client.dll offset
+# registry - the tree built locally and would not have compiled from a clone.
+/bin/
+/obj/
+/out/
+/build/
+/build*/
+target/
+x64/
+Debug/
+Release/
+*.asi
+*.pdb
+*.lib
+*.exp
+*.ilk
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.vcxproj.user
+
+# Packaging
+dist/
+release/
+packages/
+*.nupkg
+*.cache
+
+# Pixi
+.pixi/
+
+# Installer state
+.headtracking-state.json
+
+# AI tooling and store copy - kept on disk, never tracked
+.claude/
+.lab/
+.millhouse/
+.mcp.json
+AGENTS.md
+CLAUDE.md
+NEXUS_MODS.md
+
+# OS
+.DS_Store
+Thumbs.db
