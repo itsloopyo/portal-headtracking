@@ -30,6 +30,13 @@ with no VR headset required.
 
 ## Installation
 
+### Lopari
+
+Download [Lopari](https://lopari.app), choose **Portal**, and click
+**Play with head tracking**.
+
+### Standalone Installer
+
 1. Download the installer ZIP (`PortalHeadTracking-v<version>-installer.zip`) from the [Releases page](https://github.com/itsloopyo/portal-headtracking/releases).
 2. Extract it anywhere.
 3. Double-click `install.cmd`. It finds Portal, places the loader and the mod in `<game>\bin\`, and reports what it did.
