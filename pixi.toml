@@ -8,6 +8,7 @@ channels = ["conda-forge"]
 platforms = ["win-64"]
 
 [tasks]
+update-submodule = "git submodule update --remote cameraunlock-core && powershell -NoProfile -ExecutionPolicy Bypass -File cameraunlock-core/scripts/update-submodule.ps1"
 # Pull cameraunlock-core to the tip of its tracked branch. Manual: the new
 # pointer is a deliberate commit, no build task depends on this.
 sync = { cmd = "git submodule update --remote cameraunlock-core" }
