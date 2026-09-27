@@ -268,7 +268,14 @@ function Invoke-Strip {
     }
 }
 
-function Get-Sha { param([string]$Path) (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash }
+# Get-FileHash is defined in Windows PowerShell 5.1's Utility psm1, which does not load when
+# pixi starts 5.1 from a pwsh step with pwsh's PSModulePath, so hash through .NET.
+function Get-Sha {
+    param([string]$Path)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { [System.BitConverter]::ToString($sha.ComputeHash([System.IO.File]::ReadAllBytes($Path))) }
+    finally { $sha.Dispose() }
+}
 
 $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) "phtt-strip-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $sandbox -Force | Out-Null
