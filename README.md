@@ -52,8 +52,9 @@ carries the mod only, with no loader.
 
 ## Setting Up OpenTrack
 
-The mod listens for OpenTrack pose data on the UDP port set by `Port`, which
-defaults to `4242`. In OpenTrack, set **Output** to `UDP over network` and enter
+The mod listens for OpenTrack pose data on the UDP port set by `UdpPort` under
+`[Network]` in `CameraUnlock.ini`. It reads `default` there, which takes the port
+from `Defaults.ini`, or `4242` where `Defaults.ini` sets none. In OpenTrack, set **Output** to `UDP over network` and enter
 host `127.0.0.1` and that port. Map yaw, pitch and roll, and X, Y and Z as well
 if you want positional tracking. Press **Start**. Tracking and the game can
 start in either order.

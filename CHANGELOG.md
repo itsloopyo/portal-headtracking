@@ -28,11 +28,7 @@
 - The old `[Position] Enabled` becomes the tracking mode at startup, `RotationEnabled` and `PositionEnabled`. The old single `LimitY` becomes both `PositionLimitY` and `PositionLimitYDown`, which it already set, and each can now be set on its own. `WorldSpaceYaw` moves to `[General]`. `[View] Fov`, `[View] FovViewmodel` and `[Debug] LogToFile` keep their names.
 - A `HeadTracking.ini` with `LimitX`, `LimitY`, `LimitZ` or `LimitZBack` above 10 metres, which `CameraUnlock.ini` cannot hold, is not imported. The game runs on the settings it holds, nothing is saved that session, the log says which value stopped the import, and the next start tries again.
 - The HeadTracking.ini reader is unchanged since the published development build, and so is how the mod starts from what it read, so apart from the changes listed here every setting you had carries over as it was.
-- The default UDP port is now `4242`, was `5626`. It is defined once as
-  `kDefaultPort` in `src/config.h`, which feeds the config struct, the
-  `HeadTracking.ini` written on first run and the fallback for a missing or
-  malformed `Port` key. An existing `HeadTracking.ini` is not rewritten, so an
-  installed copy keeps whatever `Port` it already has.
+- The default UDP port is now `4242`, was `5626`. It is `UdpPort` under `[Network]` in `CameraUnlock.ini`.
 - The vendored Ultimate ASI Loader is no longer reported as tampered. Upstream
   ships `dinput8.dll` Authenticode signed, and zeroing the embedded third-party
   resources breaks the hash that signature covers, so Windows reported the
