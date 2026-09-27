@@ -723,7 +723,7 @@ The dedication is the file header itself; there is no separate licence file.
 
 ## cameraunlock-core
 
-- **Version:** `de8d03a06f8184253b61f0836a5e3ce9d9003934`
+- **Version:** `ee4b422ba472d462bdd3d4ea2bbf690fcd749e03`
 - **License:** `MIT`
 - **Upstream:** https://github.com/itsloopyo/cameraunlock-core
 - **Usage:** the shared head-tracking library and installer bodies for the
