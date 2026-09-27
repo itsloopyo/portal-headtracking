@@ -41,16 +41,18 @@ clean-all = { cmd = """
 # every version read and write in this repo goes through, strip-loader-payload.ps1,
 # which rewrites the binary we redistribute, and the licence text the release
 # ZIPs are obliged to carry. No Pester: matches cameraunlock-core/powershell/tests.
-test = { depends-on = ["test-version", "test-strip-loader", "validate-notices"] }
+# test-cpp is the characterization suite for the mod's pure logic and the config
+# differential test, which holds the frozen HeadTracking.ini reader to the
+# newest published build's. No game needed.
+test = { depends-on = ["test-cpp", "test-version", "test-strip-loader", "validate-notices"] }
+test-cpp = { cmd = "ctest --test-dir build -C Debug --output-on-failure", depends-on = ["build"] }
 test-version = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/ModVersion.Tests.ps1" }
 test-strip-loader = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/StripLoaderPayload.Tests.ps1" }
 
 # Gates from cameraunlock-core, run against this repo.
 # validate-notices checks that THIRD-PARTY-NOTICES.md reproduces the licence
 # text of everything the release ZIPs ship, including the components compiled
-# into the vendored loader binary. It needs node, which this workspace does not
-# declare - it comes from the machine, like the C++ toolchain and CMake do. A
-# machine without it fails the task loudly rather than skipping the gate.
+# into the vendored loader binary. It runs on the workspace's pinned node.
 # validate-manifest validates a BUILT installer ZIP under release/, so it fails
 # until `pixi run package` can produce one. It is here because the fleet's
 # tooling and error messages name it; the launcher-manifest check is
@@ -77,8 +79,9 @@ update-deps = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scrip
 # -VerifyOnly mode.
 strip-loader = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/strip-loader-payload.ps1 -Path vendor/ultimate-asi-loader/dinput8.dll" }
 
-# Package release ZIPs (installer + nexus variants).
-package = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release"] }
+# Package release ZIPs (installer + nexus variants). Depends on test, so no ZIP is
+# built from a tree whose tests or config differential test fail.
+package = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release", "test"] }
 
 # Cut a release: pixi run release <major|minor|patch|X.Y.Z>
 release = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1"
@@ -92,3 +95,8 @@ release-nightly = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/r
 # the dev path - it ships in the packaged release for the launcher / Nexus.
 install = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy.ps1 Debug", depends-on = ["build"] }
 uninstall = "scripts\\uninstall.cmd"
+
+[dependencies]
+# CMake and Visual Studio come from the system. Node runs the notices, manifest and
+# config checks, pinned to the build cameraunlock-core's own lock resolved.
+nodejs = "==26.5.0"

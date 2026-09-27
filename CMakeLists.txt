@@ -42,6 +42,7 @@ add_library(PortalHeadTracking SHARED
     src/dllmain.cpp
     src/debug_log.cpp
     src/config.cpp
+    src/legacy_config/legacy_config.cpp
     src/plugin.cpp
     src/tracker_feed.cpp
     src/hotkey_handler.cpp
