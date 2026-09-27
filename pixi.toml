@@ -46,6 +46,11 @@ clean-all = { cmd = """
 # newest published build's. No game needed.
 test = { depends-on = ["test-cpp", "test-version", "test-strip-loader", "validate-notices"] }
 test-cpp = { cmd = "ctest --test-dir build -C Debug --output-on-failure", depends-on = ["build"] }
+
+# Rewrite config/CameraUnlock.ini, the committed copy of the file the mod creates at first
+# launch, from the config table after a change to a row, a comment or a default.
+# portal_config_tests fails while the two differ.
+render-config = { cmd = "build/tests/Debug/portal_config_tests.exe --render-config config/CameraUnlock.ini && node cameraunlock-core/scripts/encode-seed.mjs", depends-on = ["build"] }
 test-version = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/ModVersion.Tests.ps1" }
 test-strip-loader = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/StripLoaderPayload.Tests.ps1" }
 

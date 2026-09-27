@@ -7,13 +7,14 @@
 namespace headtracking {
 
 class Plugin;
+struct Config;
 
 // Owns the polling thread that drives the mod's three actions from the
-// keyboard: the nav-cluster keys the config binds, plus the fixed Ctrl+Shift
-// chord alternatives in hotkeys.h.
+// keyboard, each from its key list in CameraUnlock.ini, the Ctrl+Shift chords
+// included.
 class HotkeyHandler {
 public:
-    void Start(Plugin& plugin, int toggle_vk, int yaw_mode_vk, int mode_cycle_vk);
+    void Start(Plugin& plugin, const Config& config);
 
 private:
     // ~60Hz. Fast enough that a tap is never missed, slow enough that the

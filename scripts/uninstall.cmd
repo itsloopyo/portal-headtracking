@@ -34,14 +34,14 @@ set "MOD_SEED_FILES="
 :: reinstall: paths relative to the game folder, quoted when one holds a space.
 :: Keep the line when it is blank, or the list another mod's uninstall.cmd set
 :: in the same console is used instead.
-set "PRESERVE_FILES="
+set "PRESERVE_FILES=CameraUnlock.ini HeadTracking.ini"
 :: Config and log files the mod writes at runtime, removed from wherever the
 :: DLLs were deployed.
 set "MOD_LEFTOVERS="
 :: Files to remove from the game root. Only needed by a mod deployed BELOW the
 :: root (see ASI_SUBDIR) that still resolves its config and log from the exe's
 :: own directory.
-set "ROOT_EXTRAS=HeadTracking.ini HeadTracking.log HeadTracking.prev.log"
+set "ROOT_EXTRAS=HeadTracking.log HeadTracking.prev.log"
 :: BeamNGUserMods: files the mod writes at runtime into the BeamNG user folder
 :: rather than into the mods\ folder the payload went into. Entries may carry a
 :: relative subfolder, since the game's own settings\ tree is one of the places

@@ -7,6 +7,8 @@
 #include "debug_log.h"
 #include "hotkey_handler.h"
 
+#include "cameraunlock/tracking/tracking_mode.h"
+
 namespace headtracking {
 
 // Deliberately leaked, never destroyed. A function-local static would register
@@ -23,9 +25,15 @@ Plugin& GetPlugin() {
 Plugin::Plugin() = default;
 Plugin::~Plugin() = default;
 
+cameraunlock::config::ConfigLoadResult<Config> Plugin::LoadConfig(const std::wstring& folder) {
+    m_owner.emplace(MakeConfigOwnerOptions(folder, cameraunlock::config::DefaultsFile::PerUser()));
+    cameraunlock::config::ConfigLoadResult<Config> loaded = m_owner->Load();
+    m_config = loaded.config;
+    return loaded;
+}
+
 void Plugin::Initialize() {
-    m_config = Config::LoadOrCreateDefault();
-    m_enabled.store(m_config.enabled_on_startup);
+    m_enabled.store(m_config.enable_on_startup);
     m_worldSpaceYaw.store(m_config.world_space_yaw);
 
     m_feed.Start(m_config);
@@ -44,22 +52,28 @@ void Plugin::Initialize() {
     }
 
     m_hotkeys = std::make_unique<HotkeyHandler>();
-    m_hotkeys->Start(*this, m_config.toggle_vk, m_config.yaw_mode_vk, m_config.mode_cycle_vk);
-    // Trackers disagree on whether they report in the user's frame (+X right,
-    // +Z forward) or the camera's mirrored view of it. Logging the effective
-    // inversion means a "leaning moves the wrong way" report arrives with the
-    // answer already in it.
-    HT_LOG("[plugin] position inversion: X=%d Y=%d Z=%d (flip in HeadTracking.ini "
-           "[Position] if leaning moves the view the wrong way)",
-           m_config.pos_invert_x ? 1 : 0, m_config.pos_invert_y ? 1 : 0,
-           m_config.pos_invert_z ? 1 : 0);
-    HT_LOG("[plugin] initialized");
+    m_hotkeys->Start(*this, m_config);
+    HT_LOG("[plugin] initialized - enabled=%d mode=%s yaw=%s | hotkeys toggle=[%s] "
+           "modeCycle=[%s] yawMode=[%s]",
+           m_enabled.load() ? 1 : 0, m_feed.ModeName(),
+           m_worldSpaceYaw.load() ? "world-space" : "camera-local",
+           m_config.toggle_key_name.c_str(), m_config.cycle_tracking_mode_key_name.c_str(),
+           m_config.yaw_mode_key_name.c_str());
 }
 
-// The three toggles log from here rather than from the hotkey handler, so a
-// nav key and its Ctrl+Shift chord produce the same single line - and so the
+void Plugin::LogSave(const char* what, const cameraunlock::config::ConfigSaveResult& saved) {
+    for (const std::string& line : saved.log) HT_LOG("[config] %s", line.c_str());
+    if (saved.status != cameraunlock::config::ConfigSaveStatus::Saved) {
+        HT_LOG("[config] %s not saved (%s): %s", what,
+               cameraunlock::config::ConfigSaveStatusName(saved.status), saved.reason.c_str());
+    }
+}
+
+// The three toggles log from here rather than from the hotkey handler, so
+// every key in an action's list produces the same single line - and so the
 // log names the state that was actually reached, not the one the caller asked
-// for.
+// for. They run on the hotkey thread, which is where the two that persist
+// save. End changes the session only.
 void Plugin::ToggleEnabled() {
     const bool next = !m_enabled.load();
     m_enabled.store(next);
@@ -70,11 +84,16 @@ void Plugin::ToggleYawMode() {
     const bool next = !m_worldSpaceYaw.load();
     m_worldSpaceYaw.store(next);
     HT_LOG("[plugin] yaw mode -> %s", next ? "world-space" : "camera-local");
+    LogSave("WorldSpaceYaw", m_owner->Save([next](Config& c) { c.world_space_yaw = next; }));
 }
 
 void Plugin::CycleTrackingMode() {
-    m_feed.CycleMode();
+    const cameraunlock::TrackingModeChannels mode = cameraunlock::EncodeTrackingMode(m_feed.CycleMode());
     HT_LOG("[plugin] tracking mode -> %s", m_feed.ModeName());
+    LogSave("tracking mode", m_owner->Save([mode](Config& c) {
+        c.rotation_enabled = mode.rotation_enabled;
+        c.position_enabled = mode.position_enabled;
+    }));
 }
 
 void Plugin::Update() { m_feed.Update(m_enabled.load()); }

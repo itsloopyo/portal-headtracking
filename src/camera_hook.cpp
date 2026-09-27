@@ -70,13 +70,11 @@ void Copy3(float* dst, const float* src) {
 // ----- Tracker -> Source axis mapping ---------------------------------------
 //
 // Every sign correction between the tracker frame and Source lives here, at
-// the engine boundary. It must NOT be expressed as an INI `Invert*` default:
-// the processor applies inversion BEFORE the asymmetric Z clamp, so an
-// `InvertZ` used to flip the engine convention silently moves the generous
-// LimitZ (0.40m) allowance onto the backward lean and leaves LimitZBack
-// (0.10m) for leaning in. The direction still looks right, which is why that
-// shape survives testing - the only symptom is that leaning in barely moves.
-// The `Invert*` keys stay pure user preferences, defaulting to off.
+// the engine boundary, after the processor's asymmetric Z clamp. Flipping z
+// before it would move the generous PositionLimitZ (0.40m) allowance onto the
+// backward lean and leave PositionLimitZBack (0.10m) for leaning in. The
+// direction still looks right, which is why that shape survives testing - the
+// only symptom is that leaning in barely moves.
 //
 // Tracker frame, as the pipeline delivers it:
 //     yaw   > 0  = head turns right   Source yaw   > 0 = turn left   -> negate

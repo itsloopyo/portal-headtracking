@@ -4,44 +4,18 @@
 
 #include "angles.h"
 #include "cameraunlock/math/smoothing_utils.h"
+#include "cameraunlock/tracking/tracking_mode.h"
 #include "debug_log.h"
 #include "position_mapping.h"
 
 namespace headtracking {
 
-namespace {
-
-void ApplyRotationConfig(cameraunlock::TrackingProcessor& processor, const Config& c) {
-    cameraunlock::SensitivitySettings s;
-    s.yaw = c.sens_yaw;
-    s.pitch = c.sens_pitch;
-    s.roll = c.sens_roll;
-    s.invert_yaw = c.invert_yaw;
-    s.invert_pitch = c.invert_pitch;
-    s.invert_roll = c.invert_roll;
-    processor.SetSensitivity(s);
-
-    cameraunlock::DeadzoneSettings d;
-    d.yaw = c.deadzone_yaw;
-    d.pitch = c.deadzone_pitch;
-    d.roll = c.deadzone_roll;
-    processor.SetDeadzone(d);
-}
-
-}  // namespace
-
 void TrackerFeed::Start(const Config& config) {
-    m_port = config.port;
-    // Fold the user's per-axis inversion into the world scale so it lands
-    // after the processor's asymmetric Z clamp - see MakePositionSettings.
-    m_scaleX = config.pos_world_scale * (config.pos_invert_x ? -1.0f : 1.0f);
-    m_scaleY = config.pos_world_scale * (config.pos_invert_y ? -1.0f : 1.0f);
-    m_scaleZ = config.pos_world_scale * (config.pos_invert_z ? -1.0f : 1.0f);
-    m_session.SetMode(config.pos_enabled
-                          ? cameraunlock::TrackingMode::RotationAndPosition
-                          : cameraunlock::TrackingMode::RotationOnly);
+    m_port = static_cast<uint16_t>(config.udp_port);
+    // The table reads a pair that names no mode as its defaults, so the pair always decodes.
+    m_session.SetMode(
+        cameraunlock::DecodeTrackingMode(config.rotation_enabled, config.position_enabled).value());
 
-    ApplyRotationConfig(m_session.GetProcessor(), config);
     m_session.SetLocalSmoothing(config.local_smoothing);
     m_session.SetRemoteSmoothing(config.remote_smoothing);
     // Through the session, not straight onto the processor: the session owns
@@ -79,7 +53,7 @@ void TrackerFeed::Invalidate() {
     m_cachedPosValid.store(false, std::memory_order_release);
 }
 
-void TrackerFeed::CycleMode() { m_session.CycleMode(); }
+cameraunlock::TrackingMode TrackerFeed::CycleMode() { return m_session.CycleMode(); }
 
 const char* TrackerFeed::ModeName() const {
     switch (m_session.GetMode()) {
@@ -126,9 +100,9 @@ void TrackerFeed::Update(bool enabled) {
 
     float ox = 0.0f, oy = 0.0f, oz = 0.0f;
     if (m_session.GetPositionOffset(ox, oy, oz)) {
-        m_cachedPosX.store(ox * m_scaleX, std::memory_order_release);
-        m_cachedPosY.store(oy * m_scaleY, std::memory_order_release);
-        m_cachedPosZ.store(oz * m_scaleZ, std::memory_order_release);
+        m_cachedPosX.store(ox * kWorldUnitsPerMetre, std::memory_order_release);
+        m_cachedPosY.store(oy * kWorldUnitsPerMetre, std::memory_order_release);
+        m_cachedPosZ.store(oz * kWorldUnitsPerMetre, std::memory_order_release);
         m_cachedPosValid.store(true, std::memory_order_release);
     } else {
         m_cachedPosValid.store(false, std::memory_order_release);

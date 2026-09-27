@@ -31,7 +31,8 @@ public:
     bool GetRotationRadians(float& yaw, float& pitch, float& roll) const;
     bool GetPositionOffset(float& x, float& y, float& z) const;
 
-    void CycleMode();
+    // Moves to the next tracking mode and returns it.
+    cameraunlock::TrackingMode CycleMode();
     const char* ModeName() const;
 
 private:
@@ -50,12 +51,6 @@ private:
     static_assert(decltype(m_session)::kHasRemoteConnection,
                   "receiver must expose IsRemoteConnection() or remote smoothing never applies");
     cameraunlock::time::FrameClock m_frameClock;
-    // Metres -> Source units, carrying the user's Invert* preference as a sign
-    // so inversion lands after the processor's asymmetric Z clamp.
-    float m_scaleX = kDefaultPosWorldScale;
-    float m_scaleY = kDefaultPosWorldScale;
-    float m_scaleZ = kDefaultPosWorldScale;
-
     bool m_isRemoteConnection = false;
     // Tri-state: false/false is indistinguishable from a local tracker, so a
     // plain equality check never reports the (common) local case at all.
