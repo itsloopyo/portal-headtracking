@@ -4,18 +4,6 @@ An unofficial head tracking mod for Portal that moves the view with your head
 while your mouse or controller keeps aiming, driven by an OpenTrack UDP feed,
 with no VR headset required.
 
-> **Status: the mod is not built yet.** This repository currently holds the
-> release tooling, the installer wrappers and the vendored ASI loader. There is
-> no `src/` payload, no `CMakeLists.txt` and no `PortalHeadTracking.asi`, so
-> there is nothing to download and `pixi run package` does not yet produce a
-> ZIP. `install.cmd` does not work either: it looks the game up by id in
-> `cameraunlock-core/data/games.json`, which has no `portal` entry yet, so it
-> fails with `Unknown game id: portal` and exits non-zero. Passing the path
-> explicitly does not get round that, because the id lookup runs before the
-> path is considered. The sections below describe what the mod is meant to do
-> and what the shared library it will be built on already accepts. They are a
-> specification, not a description of shipped behaviour.
-
 ## Features
 
 - **Decoupled look and aim** - head tracking moves the camera; the portal gun still aims with your mouse or controller
@@ -255,10 +243,6 @@ pixi run test
 pixi run build
 pixi run package
 ```
-
-`pixi run test` passes today. `pixi run build` and `pixi run package` do not:
-there is no `CMakeLists.txt` and no payload source yet, so CMake has nothing to
-configure. See the status note at the top.
 
 ## Community & Support
 
