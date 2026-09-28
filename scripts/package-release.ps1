@@ -196,6 +196,18 @@ if (Test-Path $vendorReadme) { Copy-Item $vendorReadme $vendorStage }
 
 Copy-Item $wrappers -Destination $installerStage
 
+# The launcher deploys natively from launcher-manifest.json at the ZIP root, and
+# the version is stamped from src/version.h so it names the binary beside it.
+# BOM-less, since PS 5.1's Set-Content -Encoding utf8 writes a BOM.
+$manifestPath = Join-Path $repoRoot 'launcher-manifest.json'
+if (-not (Test-Path $manifestPath)) { throw "Missing manifest: $manifestPath" }
+$manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+$manifest.mod_info.version = $version
+[IO.File]::WriteAllText(
+    (Join-Path $installerStage 'launcher-manifest.json'),
+    ($manifest | ConvertTo-Json -Depth 10),
+    (New-Object System.Text.UTF8Encoding $false))
+
 # shared/ is mandatory wherever install.cmd ships: both wrappers resolve the
 # game through shared/find-game.ps1 on every run, even when handed an explicit
 # path. A ZIP without it fails on the user's first invocation.
