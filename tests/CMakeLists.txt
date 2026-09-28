@@ -93,3 +93,4 @@ add_test(NAME portal_config_lint COMMAND node
     ${CMAKE_CURRENT_SOURCE_DIR}/config_differential/lint-migrated.mjs
     $<TARGET_FILE_DIR:portal_config_differential_tests>/migrated)
 set_tests_properties(portal_config_lint PROPERTIES DEPENDS portal_config_differential_tests)
+set_tests_properties(portal_config_differential_tests portal_config_lint PROPERTIES LABELS differential)

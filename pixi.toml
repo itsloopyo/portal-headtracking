@@ -41,11 +41,13 @@ clean-all = { cmd = """
 # every version read and write in this repo goes through, strip-loader-payload.ps1,
 # which rewrites the binary we redistribute, and the licence text the release
 # ZIPs are obliged to carry. No Pester: matches cameraunlock-core/powershell/tests.
-# test-cpp is the characterization suite for the mod's pure logic and the config
-# differential test, which holds the frozen HeadTracking.ini reader to the
-# newest published build's. No game needed.
-test = { depends-on = ["test-cpp", "test-version", "test-strip-loader", "validate-notices"] }
-test-cpp = { cmd = "ctest --test-dir build -C Debug --output-on-failure", depends-on = ["build"] }
+# test-cpp is the characterization suite for the mod's pure logic. test-differential
+# is the config differential test, which holds the frozen HeadTracking.ini reader
+# to the newest published build's, and the lint over what it migrated. No game needed.
+test-unit = { depends-on = ["test-cpp", "test-version", "test-strip-loader", "validate-notices"] }
+test-differential = { cmd = "ctest --test-dir build -C Debug --output-on-failure --no-tests=error -L differential", depends-on = ["build"] }
+test = { depends-on = ["test-unit", "test-differential"] }
+test-cpp = { cmd = "ctest --test-dir build -C Debug --output-on-failure -LE differential", depends-on = ["build"] }
 
 # Rewrite config/CameraUnlock.ini, the committed copy of the file the mod creates at first
 # launch, from the config table after a change to a row, a comment or a default.
@@ -86,7 +88,7 @@ strip-loader = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scri
 
 # Package release ZIPs (installer + nexus variants). Depends on test, so no ZIP is
 # built from a tree whose tests or config differential test fail.
-package = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release", "test"] }
+package = { cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["build-release", "test-unit"] }
 
 # Cut a release: pixi run release <major|minor|patch|X.Y.Z>
 release = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1"

@@ -14,13 +14,12 @@ on:
       - 'docs/**'
       - 'LICENSE'
 
-# Read-only token. This job runs on every branch push and on pull requests, so
-# it is the widest-reach workflow in the repo; it only needs to read the repo
-# (checkout + submodule). Without the block the job inherits whatever the
-# repository default is, which is write on repos created before the default
-# changed.
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -52,10 +51,10 @@ jobs:
           run-install: false
 
       # Build, test and package through the SAME command a developer runs
-      # locally: package depends on test, which runs the C++ suites, the config
-      # differential test, the script behaviour locks and the licence gate. All
-      # build logic lives in the pixi task chain; the workflow owns none, so
-      # local and CI cannot drift.
+      # locally: package depends on test-unit, which runs the C++ suites, the
+      # script behaviour locks and the licence gate. All build logic lives in
+      # the pixi task chain; the workflow owns none, so local and CI cannot
+      # drift.
       - name: Build and package
         shell: pwsh
         run: pixi run package

@@ -228,6 +228,18 @@ $tag = "v$Version"
 
 Assert-ReleasePreconditions -Tag $tag -NewVersion $Version
 
+Write-Host "Running the full test suite..." -ForegroundColor Cyan
+Push-Location $projectDir
+try {
+    pixi run test
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: pixi run test failed. Nothing was changed." -ForegroundColor Red
+        exit 1
+    }
+} finally {
+    Pop-Location
+}
+
 Sync-CoreNotices
 
 Write-Host "Current version: $current" -ForegroundColor Gray
