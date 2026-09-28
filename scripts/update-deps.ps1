@@ -28,6 +28,24 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
 
+# Not Get-FileHash: Windows PowerShell 5.1 autoloads it from a script module,
+# and a powershell.exe started from pwsh (GitHub Actions' shell: pwsh)
+# inherits pwsh's PSModulePath, resolves the Core-only
+# Microsoft.PowerShell.Utility first and reports the cmdlet as not recognized.
+function Get-Sha256Hex {
+    [OutputType([string])]
+    param([Parameter(Mandatory)][string]$LiteralPath)
+
+    $sha    = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead((Convert-Path -LiteralPath $LiteralPath))
+    try {
+        return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+}
+
 $scriptDir  = $PSScriptRoot
 $projectDir = Split-Path -Parent $scriptDir
 
@@ -146,7 +164,7 @@ try {
     $stagedDll = Join-Path $stageDir 'dinput8.dll'
     Expand-LoaderDll -ArchivePath $meta.LocalPath -AssetName $meta.AssetName -Destination $stagedDll
 
-    $upstreamSha = (Get-FileHash -LiteralPath $stagedDll -Algorithm SHA256).Hash.ToLower()
+    $upstreamSha = Get-Sha256Hex -LiteralPath $stagedDll
 
     $AsiLoaderVersionPattern = 'set "ASI_LOADER_VERSION=[^"]*"'
     $AsiLoaderVersionLiteral = "set `"ASI_LOADER_VERSION=$($meta.Tag -replace '^v', '')`""
@@ -161,13 +179,13 @@ try {
     Write-Host "    stripping the loader's embedded third-party DLLs..." -ForegroundColor DarkGray
     & (Join-Path $scriptDir 'strip-loader-payload.ps1') -Path $stagedDll
 
-    $dllSha = (Get-FileHash -LiteralPath $stagedDll -Algorithm SHA256).Hash.ToLower()
+    $dllSha = Get-Sha256Hex -LiteralPath $stagedDll
 
     # Idempotency: an unchanged upstream must leave the tree clean. Rewriting
     # README.md unconditionally would churn its fetched_at on every run and
     # produce a commit that says nothing.
     $unchanged = (Test-Path $vendorDll) -and (Test-Path $readmePath) -and (Test-Path $licensePath) -and
-        ((Get-FileHash -LiteralPath $vendorDll -Algorithm SHA256).Hash.ToLower() -eq $dllSha)
+        ((Get-Sha256Hex -LiteralPath $vendorDll) -eq $dllSha)
 
     if ($unchanged) {
         Write-Host "    no change (dinput8.dll sha256=$($dllSha.Substring(0,12))... matches on-disk vendor copy)" -ForegroundColor DarkGray
