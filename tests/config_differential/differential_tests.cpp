@@ -26,15 +26,15 @@
 //                 code now applies: identity, and kWorldUnitsPerMetre for WorldScale.
 //   N3            a hotkey code on a Ctrl, Shift or Alt key alone is unbound and logged, and the
 //                 action keeps its Ctrl+Shift chord.
+//   N4            a limit above the canonical rows' 10 metres imports as 10 and is logged. The
+//                 dev build read the four limits with no upper bound.
 //   untouched     a setting the player never changed from what the dev build shipped follows
 //                 Defaults.ini (owner rule of 2026-09-26): the migration writes it `default`, and
 //                 the session runs on what Defaults.ini gives it. The mode pair goes as one unit.
 //
 // The reader replaces a float that is not finite, clamps the smoothing pair into 0 to 1, and
-// keeps every hotkey code inside 0x01-0xFE, so neither N1 nor N2 can apply. It reads the
-// four limits with no upper bound, and the canonical rows take 0 to 10 metres; core has no rule
-// for a value outside a concept's range, so the owner defers such a file, the session runs on
-// what the import read, and nothing is created or saved (kUnrepresentable).
+// keeps every hotkey code inside 0x01-0xFE, so neither N1 nor N2 can apply. The dev build
+// shipped once, so there is one set of shipped defaults to compare an untouched setting with.
 //
 // Each input with a file migrates three times: over a Defaults.ini the owner creates with the
 // built-in values, from a read-only HeadTracking.ini, and over a Defaults.ini that differs from
@@ -600,6 +600,16 @@ Allowed ApplyApprovedChanges(const headtracking::legacy::Config& read) {
         a.dropped.push_back({cfg::DropRule::ModifierKey, "Hotkeys", key});
         o.hotkeys.erase(std::find(o.hotkeys.begin(), o.hotkeys.end(), Hotkey{action, vk, kPlain}));
     }
+
+    const auto limit = [&a](float value, const char* key, std::initializer_list<float*> observed) {
+        if (value <= 10.0f) return;
+        a.dropped.push_back({cfg::DropRule::NumberOutOfRange, "Position", key});
+        for (float* field : observed) *field = 10.0f;
+    };
+    limit(read.pos_limit_x, "LimitX", {&o.limit_x});
+    limit(read.pos_limit_y, "LimitY", {&o.limit_y, &o.limit_y_down});
+    limit(read.pos_limit_z, "LimitZ", {&o.limit_z});
+    limit(read.pos_limit_z_back, "LimitZBack", {&o.limit_z_back});
     std::sort(a.dropped.begin(), a.dropped.end());
     return a;
 }
@@ -673,17 +683,6 @@ Observed FollowDefaults(Observed want, const std::vector<Concept>& untouched, co
     }
     std::sort(want.hotkeys.begin(), want.hotkeys.end());
     return want;
-}
-
-// The dev build read the four [Position] limits with no upper bound, and the canonical rows
-// take 0 to 10 metres.
-constexpr const char* kUnrepresentable =
-    "[Position] LimitX, LimitY, LimitZ or LimitZBack above 10, which the canonical rows cannot hold, so the "
-    "import defers";
-
-bool Unrepresentable(const headtracking::legacy::Config& read) {
-    return read.pos_limit_x > 10.0f || read.pos_limit_y > 10.0f || read.pos_limit_z > 10.0f ||
-           read.pos_limit_z_back > 10.0f;
 }
 
 std::vector<std::string> CanonicalDiagnostics(const std::string& bytes, headtracking::Config& out) {
@@ -767,7 +766,7 @@ fs::path MigratedFolder() {
 // Runs the owner's Load in `s`, whose game folder holds the input as HeadTracking.ini or
 // nothing, checks what a load must do beyond comparison 2, and returns the settings the session
 // runs on. A file it creates by migrating goes into `migrated_files`.
-headtracking::Config Migrate(const Input& input, const Scratch& s, const std::string& label, bool deferred,
+headtracking::Config Migrate(const Input& input, const Scratch& s, const std::string& label, bool clamped,
                              const std::vector<Concept>& untouched, std::set<std::string>& migrated_files) {
     const fs::path legacy = fs::path(s.wini());
     const std::optional<FileState> legacy_before = StateOf(legacy);
@@ -776,16 +775,6 @@ headtracking::Config Migrate(const Input& input, const Scratch& s, const std::st
     const cfg::ConfigLoadResult<headtracking::Config> loaded =
         cfg::ConfigOwner<headtracking::Config>(s.Options()).Load();
     Check(StateOf(legacy) == legacy_before, label + ": a load leaves HeadTracking.ini's bytes, write time and attributes");
-
-    if (deferred) {
-        Check(loaded.status == cfg::ConfigLoadStatus::Deferred,
-              label + ": " + kUnrepresentable + ", but the load is " + cfg::ConfigLoadStatusName(loaded.status));
-        Check(s.Names() == std::set<std::string>{"HeadTracking.ini"},
-              label + ": a deferred import leaves HeadTracking.ini alone in the game folder");
-        Check(loaded.reason.find("cannot be converted") != std::string::npos,
-              label + ": the player is told which value stops the import: " + loaded.reason);
-        return loaded.config;
-    }
 
     const cfg::ConfigLoadStatus want = input.present ? cfg::ConfigLoadStatus::Migrated : cfg::ConfigLoadStatus::Created;
     if (loaded.status != want) {
@@ -796,6 +785,8 @@ headtracking::Config Migrate(const Input& input, const Scratch& s, const std::st
     Check(s.Names() == (input.present ? both : std::set<std::string>{"CameraUnlock.ini"}),
           label + ": the game folder holds HeadTracking.ini and CameraUnlock.ini and nothing else");
     Check(!input.present || LogSays(loaded.log, "created from"), label + ": the log says where CameraUnlock.ini came from");
+    Check(!clamped || LogSays(loaded.log, "outside the range this setting takes"),
+          label + ": the log says a limit above 10 metres imports as 10");
 
     const std::string migrated = ReadFileBytes(s.canonical());
     Check(cfg::HasCanonicalStamp(migrated), label + ": CameraUnlock.ini carries the stamp");
@@ -836,7 +827,7 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
           "the skewed Defaults.ini differs from the built-in values on every global row");
     std::set<std::string> migrated_files;
     int compared = 0;
-    int deferred_inputs = 0;
+    int clamped_inputs = 0;
     for (const Input& input : inputs) {
         const std::string& name = input.name;
 
@@ -873,8 +864,10 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
                                            Drop{cfg::DropRule::PoseShaping, p.section, p.key}) != allowed.dropped.end();
             Check(p.folded != changed, name + ": [" + p.section + "] " + p.key + " folds exactly when it is the shipped value");
         }
-        const bool deferred = input.present && Unrepresentable(read);
-        if (deferred) ++deferred_inputs;
+        const bool clamped = std::any_of(allowed.dropped.begin(), allowed.dropped.end(), [](const Drop& d) {
+            return std::get<0>(d) == cfg::DropRule::NumberOutOfRange;
+        });
+        if (clamped) ++clamped_inputs;
 
         const auto compare = [&](const headtracking::Config& got, const Observed& want, const std::string& label) {
             const std::vector<std::string> diff = Differences(want, ObserveCanonical(got));
@@ -882,19 +875,16 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
             Check(diff.empty(), "comparison 2: the session runs as the import read, less the approved changes: " + label);
         };
 
-        // Over a Defaults.ini the owner creates with the built-in values. Imported or deferred,
-        // the session runs on the settings the load hands back.
+        // Over a Defaults.ini the owner creates with the built-in values.
         {
             Scratch s;
             if (input.present) s.Write(input.bytes);
-            const headtracking::Config migrated = Migrate(input, s, name, deferred, untouched, migrated_files);
+            const headtracking::Config migrated = Migrate(input, s, name, clamped, untouched, migrated_files);
             compare(migrated, FollowDefaults(allowed.observed, untouched, builtin), name);
-            if (!deferred) {
-                headtracking::Config reread;
-                CanonicalDiagnostics(ReadFileBytes(s.canonical()), reread);
-                Check(Differences(ObserveCanonical(reread), ObserveCanonical(migrated)).empty(),
-                      name + ": CameraUnlock.ini reads back as the settings the session runs on");
-            }
+            headtracking::Config reread;
+            CanonicalDiagnostics(ReadFileBytes(s.canonical()), reread);
+            Check(Differences(ObserveCanonical(reread), ObserveCanonical(migrated)).empty(),
+                  name + ": CameraUnlock.ini reads back as the settings the session runs on");
 
             // Fresh equals upgrade: the published build's first-run file, and no file at all,
             // both end as the committed file.
@@ -908,7 +898,7 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
             Scratch ro;
             ro.Write(input.bytes);
             SetFileAttributesA(ro.ini().c_str(), FILE_ATTRIBUTE_READONLY);
-            compare(Migrate(input, ro, name + " (read-only)", deferred, untouched, migrated_files),
+            compare(Migrate(input, ro, name + " (read-only)", clamped, untouched, migrated_files),
                     FollowDefaults(allowed.observed, untouched, builtin), name + " (read-only)");
             Check((GetFileAttributesA(ro.ini().c_str()) & FILE_ATTRIBUTE_READONLY) != 0,
                   name + ": HeadTracking.ini keeps its read-only attribute");
@@ -920,13 +910,13 @@ void ImportAgainstMigration(const std::vector<Input>& inputs) {
             Scratch skewed;
             skewed.Write(input.bytes);
             skewed.WriteDefaults(kSkewedDefaults);
-            compare(Migrate(input, skewed, name + " (skewed Defaults.ini)", deferred, untouched, migrated_files),
+            compare(Migrate(input, skewed, name + " (skewed Defaults.ini)", clamped, untouched, migrated_files),
                     FollowDefaults(allowed.observed, untouched, skewed_defaults), name + " (skewed Defaults.ini)");
         }
         ++compared;
     }
-    std::printf("comparison 2: %d inputs, %d deferred (%s)\n", compared, deferred_inputs, kUnrepresentable);
-    Check(deferred_inputs > 0, "the corpus reaches a limit the canonical rows cannot hold");
+    std::printf("comparison 2: %d inputs, %d with a limit above 10 metres (N4)\n", compared, clamped_inputs);
+    Check(clamped_inputs > 0, "the corpus reaches a limit above the canonical rows' 10 metres");
 
     // Core's canonical config lint runs over these next (lint-migrated.mjs).
     const fs::path lint = MigratedFolder();

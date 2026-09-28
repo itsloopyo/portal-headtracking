@@ -26,7 +26,7 @@
 - Hotkeys are written as key names, and each hotkey lists every key that triggers it, the Ctrl+Shift chord included: `ToggleKey=End, Ctrl+Shift+Y`. The chords were fixed in code before; now they can be changed or removed like any other key.
 - The tracking mode (`PageUp`) and the yaw mode (`PageDown`) are saved to `CameraUnlock.ini` when they change, so the next launch starts in the mode you left. `End` still changes the session only.
 - The old `[Position] Enabled` becomes the tracking mode at startup, `RotationEnabled` and `PositionEnabled`. The old single `LimitY` becomes both `PositionLimitY` and `PositionLimitYDown`, which it already set, and each can now be set on its own. `WorldSpaceYaw` moves to `[General]`. `[View] Fov`, `[View] FovViewmodel` and `[Debug] LogToFile` keep their names.
-- A `HeadTracking.ini` with `LimitX`, `LimitY`, `LimitZ` or `LimitZBack` above 10 metres, which `CameraUnlock.ini` cannot hold, is not imported. The game runs on the settings it holds, nothing is saved that session, the log says which value stopped the import, and the next start tries again.
+- A `LimitX`, `LimitY`, `LimitZ` or `LimitZBack` above 10 metres in `HeadTracking.ini`, more than `CameraUnlock.ini` holds, is imported as 10, and the log says so.
 - The HeadTracking.ini reader is unchanged since the published development build, and so is how the mod starts from what it read, so apart from the changes listed here every setting you had carries over as it was.
 - The default UDP port is now `4242`, was `5626`. It is `UdpPort` under `[Network]` in `CameraUnlock.ini`.
 - The vendored Ultimate ASI Loader is no longer reported as tampered. Upstream
